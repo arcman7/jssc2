@@ -1,0 +1,69 @@
+{
+  "name": "PySC2",
+  "version": "3.1.0",
+  "description": "This package is a JavaScript port of the deepmind/pysc2 Starcraft II environment and library for training agents.",
+  "author": "Andrew R Carpenter, Jihan Kim",
+  "author_email": "andrewryancarpenter77@gmail.com, jihan1218@gmail.com",
+  "license": "Apache License, Version 2.0",
+  "keywords": [
+    "Javascript",
+    "StarCraft AI",
+    "pysc2",
+    "deepmind",
+    "Starcraft",
+    "machine learning",
+    "AI"
+  ],
+  "url": "https://github.com/arcman7/pysc2",
+  "main": "pysc2/pysc2.bundle.js",
+  "scripts": {
+    "pysc2_agent": "npm run pysc2.bin.agent:entry_point",
+    "pysc2_play": "npm run pysc2.bin.play:entry_point",
+    "pysc2_replay_info": "npm run pysc2.bin.replay_info:entry_point",
+    "tests": "jest --colors",
+    "build_launch_renderer": "cd pysc2/pysc2/lib && browserify -r ./renderer_human/tensorflow_stub.js:@tensorflow/tfjs -r ./renderer_human/tensorflow_backend_stub.js:@tensorflow/tfjs-node -r s2clientprotocol -r gamejs -r ./pythonUtils.js -r ./numpy.js -r ./named_array.js -r ./static_data.js -r ./stopwatch.js -r ./point.js -r ./colors.js -r ./transform.js -r ./actions.js -r ./features.js -r ./protocol.js -r ./renderer_human.js > ./renderer_human/bundle.js && node renderer_human.test.js"
+  },
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.0.20",
+    "@tensorflow/tfjs": "^2.0.1",
+    "@tensorflow/tfjs-backend-wasm": "^2.0.1",
+    "@tensorflow/tfjs-core": "^2.0.1",
+    "@tensorflow/tfjs-node": "^2.0.1",
+    "@tensorflow/tfjs-node-gpu": "^1.7.4",
+    "acorn": "^6.4.1",
+    "binascii": "0.0.2",
+    "collections": "^5.1.11",
+    "crypto": "^1.0.1",
+    "deep-diff": "^1.0.2",
+    "dev-dependencies": "^1.0.0",
+    "double-ended-queue": "^2.1.0-0",
+    "empeeku": "^1.0.2",
+    "flags": "^0.1.3",
+    "fluent-ffmpeg": "^2.1.2",
+    "gamejs": "^2.0.2",
+    "get-port": "^5.1.1",
+    "google-protobuf": "^3.12.4",
+    "mpyqjs": "^1.0.1",
+    "node-worker-threads-pool": "^1.4.0",
+    "protobufjs": "^6.10.1",
+    "python-enum": "^1.1.0",
+    "s2clientprotocol": "^1.0.3",
+    "tempy": "^0.5.0",
+    "threading-js": "^1.0.6",
+    "ws": "^7.3.1"
+  },
+  "devDependencies": {
+    "eslint": "^6.8.0",
+    "eslint-config-airbnb-base": "^14.2.0",
+    "eslint-plugin-import": "^2.22.0",
+    "jest": "^25.5.4",
+    "node-pre-gyp": "^0.14.0"
+  },
+  "jest": {
+    "modulePathIgnorePatterns": [
+      ".git",
+      "/tests/",
+      "renderer_human"
+    ]
+  }
+}

@@ -1,0 +1,287 @@
+<html>
+<head>
+  <!-- <script id ="tensorflow" src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/2.0.1/tf.es2017.js"></script> -->
+  <!-- <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm/dist/tf-backend-wasm.js"></script> -->
+  <!-- Import @tensorflow/tfjs or @tensorflow/tfjs-core -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+ 
+<!-- Adds the WASM backend to the global backend registry -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm/dist/tf-backend-wasm.js"></script>
+ 
+  <script id="s2clientprotocol" src="/renderer_human/s2clientprotocol.js"></script>
+  <script id="bundle" src="/renderer_human/bundle.js"></script>
+  <script id="main">
+const s2clientprotocol = require('s2clientprotocol') //eslint-disable-line
+const renderer_human = require('/renderer_human.js') //eslint-disable-line
+const stopwatch = require('/stopwatch.js') //eslint-disable-line
+const pythonUtils = require('/pythonUtils.js') //eslint-disable-line
+const static_data = require('/static_data.js') //eslint-disable-line
+const sc_pb = s2clientprotocol.sc2api_pb
+const { assert, snakeToPascal, withPython } = pythonUtils
+
+// stopwatch.sw.enable()
+const gamejs = require('gamejs') //eslint-disable-line
+window.gamejs = gamejs
+gamejs.font.Font.prototype.render = function(text, color, padding, textBaseline) {
+  const dims = this.size(text);
+  padding = padding || Math.ceil(dims[1] * 0.2)
+  dims[1] += padding
+  const surface = new window.gamejs.graphics.Surface(dims);
+  const ctx = surface.context;
+  ctx.save();
+  if (this.backgroundColor) {
+    ctx.fillStyle = this.backgroundColor;
+    ctx.fillRect(0, 0, surface.rect.width, surface.rect.height);
+  }
+  ctx.font = this.sampleSurface.context.font;
+  ctx.textBaseline = textBaseline || 'alphabetic'
+  ctx.textAlign = this.sampleSurface.context.textAlign;
+  ctx.fillStyle = ctx.strokeStyle = color || "#000000"; //eslint-disable-line
+  ctx.fillText(text, 0, surface.rect.height - padding, surface.rect.width);
+  ctx.restore();
+  return surface;
+};
+gamejs.mouse = {
+  get_pos() {
+    return gamejs.mouse.pos || { x: 0, y: 0 }
+  }
+}
+gamejs.events = []
+gamejs.event.onEvent((e) => {
+  if (e.type === gamejs.event.MOUSE_MOTION) {
+    gamejs.mouse.pos = e.pos
+  }
+  gamejs.events.push(e)
+})
+gamejs.getEvents = function() {
+  const events = gamejs.events
+  gamejs.events = []
+  return events
+}
+
+const urlParams = new URLSearchParams(window.location.search) //eslint-disable-line
+const port = urlParams.get('port');
+const host = '127.0.0.1';
+const url = `ws://${host}:${port}/`;
+
+class WsClient {
+  constructor(url) { //eslint-disable-line
+    this._ws = null
+    this.url = url
+    this._trigger = null
+    this._que = []
+    this._sw = stopwatch.sw
+    this._count = 1
+  }
+
+  getWSClient(wsUrl, callback) { //eslint-disable-line
+    let resolve;
+    let reject;
+    const prom = new Promise((res, rej) => {
+      resolve = res
+      reject = rej
+    });
+    const ws = new WebSocket(wsUrl);
+    ws.binaryType = 'arraybuffer'
+    function handleError(err) {
+      reject(err)
+    }
+    ws.addEventListener('open', () => {
+      ws.removeEventListener('error', handleError)
+      resolve(ws)
+    })
+    ws.addEventListener('error', handleError)
+    ws.addEventListener('message', (e) => {
+      callback(new Uint8Array(e.data))
+    })
+    return prom
+  }
+
+  next(n) {
+    this._count = n + 1
+    return this._count
+  }
+
+  _catchData(response) {
+    if (!response) {
+      throw new Error('Got an empty response from SC2.')
+    }
+    if (this._trigger) {
+      this._trigger(response)
+      this._trigger = null
+      return
+    }
+    this._que.push(response)
+  }
+
+  async read() {
+    //Actually read the response and parse it, returning a Response.//
+    let response = await withPython(this._sw('read_response'), async () => {
+      if (this._que.length) {
+        return this._que.shift()
+      }
+      return new Promise((resolve) => {
+        this._trigger = resolve
+      })
+    })
+    withPython(this._sw('parse_response'), () => {
+      response = sc_pb.Response.deserializeBinary(response)
+      // console.log(response.toObject())
+    })
+    return response
+  }
+
+  write(request) {
+    //Actually serialize and write the request.//
+    let request_str
+    withPython(this._sw('serialize_request'), () => {
+      request_str = request.serializeBinary()
+    })
+    withPython(this._sw('write_request'), () => {
+      try { //eslint-disable-line
+        this._ws.send(request_str)
+      } catch (err) {
+        /* TODO: Handling of different error types
+            raise ConnectionError("Connection already closed. SC2 probably crashed. "
+              "Check the error log.")
+            except websocket.WebSocketTimeoutException:
+              raise ConnectionError("Websocket timed out.")
+            except socket.error as e:
+              raise ConnectionError("Socket error: %s" % e)
+        */
+        throw err
+      }
+    })
+  }
+
+  send_req(request) {
+    this.write(request)
+    return this.read()
+  }
+
+  async send(kwargs) {
+    /*
+    Create and send a specific request, and return the response.
+
+    For example: send(ping=sc_pb.RequestPing()) => sc_pb.ResponsePing
+
+    Args:
+      **kwargs: A single kwarg with the name and value to fill in to Request.
+
+    Returns:
+      The Response corresponding to your request.
+    Raises:
+      ConnectionError: if it gets a different response.
+    */
+    const names = Object.keys(kwargs)
+    assert(names.length === 1, 'Must make a single request')
+    let name = names[0]
+    const val = kwargs[name]
+    const req = new sc_pb.Request() // init proto req class
+    name = snakeToPascal(name)
+    const isList = Array.isArray(val)
+    // proto setters: setFoo, setFooList
+    req[`set${name + (isList ? 'List' : '')}`](val)
+    req.setId(this.next(this._count))
+    let res
+    try {
+      // console.log(req.toObject())
+      res = await this.send_req(req)
+    } catch (err) {
+      console.warn('req:\n', req.toObject(), '\nres:\n', res ? res.toObject() : 'undefined')
+      throw new Error(`Error during ${name}: ${err}`)
+    }
+
+    return res[`get${name + (isList ? 'List' : '')}`]()
+  }
+
+  async game_info() {
+    //Get the basic information about the game.//
+    return this.send({ game_info: new sc_pb.RequestGameInfo() })
+  }
+
+  async data_raw(ability_id = true, unit_type_id = true, upgrade_id = true, buff_id = true, effect_id = true) {
+    //Get the raw static data for the current game. Prefer `data` instead.//
+    const req = new sc_pb.RequestData()
+    req.setAbilityId(ability_id)
+    req.setUnitTypeId(unit_type_id)
+    req.setUpgradeId(upgrade_id)
+    req.setBuffId(buff_id)
+    req.setEffectId(effect_id)
+    return this.send({ data: req })
+  }
+
+  async data() {
+    //Get the static data for the current game.//
+    const reqData = await this.data_raw()
+    return new static_data.StaticData(reqData.toObject())
+  }
+
+  save_repaly() {
+    this.send({ save_replay: new sc_pb.RequestSaveReplay() })
+  }
+
+  async start_observe_stream(disable_fog = false, target_game_loop = 0) {
+    const req = new sc_pb.RequestObservation()
+    req.setGameLoop(target_game_loop)
+    req.setDisableFog(disable_fog)
+    // returns first observation
+    return this.send({ observation: req })
+  }
+
+  async init() {
+    this._ws = await this.getWSClient(this.url, this._catchData.bind(this))
+  }
+}
+
+async function main() {
+  const wsClient = new WsClient(url)
+  await wsClient.init()
+
+  const renderer = new renderer_human.RendererHuman()
+  const gameInfo = await wsClient.game_info()
+  const staticData = await wsClient.data()
+  await renderer.init(gameInfo, staticData)
+  // from here on only sending observations over the wire
+  /* eslint-disable no-await-in-loop */
+  renderer.render_thread()
+  let obs
+  let response
+  await wsClient.start_observe_stream()
+  let count = 0
+  while (true) {
+    console.log('game step: ', ++count)
+    response = await wsClient.read()
+    obs = response.getObservation()
+    await renderer.render(obs)
+  }
+}
+/* utilize wasm */
+if (window.useWasm) {
+  window.tf.wasm.setWasmPath('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm/dist/tfjs-backend-wasm.wasm')
+  window.tf.setBackend('wasm').then(() => {
+    gamejs.ready(main)
+  })
+} else {
+  gamejs.ready(main)
+}
+</script>
+<style>
+#gjs-canvas {
+  border: 1px solid #ccc;
+  /*margin: 20px;*/
+  /*box-shadow: 14px 10px 30px 0px rgba(50, 50, 50, 0.75);*/
+  /*width: calc(100% - 40px);*/
+  /*height: calc(100% - 60px);*/
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  /** automatically made visible once game is loaded **/
+  display:none;
+}
+</style>
+</head>
+<body id="body">
+  <canvas id="gjs-canvas"></canvas>
+</body>
+</html>

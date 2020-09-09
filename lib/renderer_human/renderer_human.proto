@@ -1,0 +1,80 @@
+package human_renderer;
+syntax = "proto3";
+
+
+message DrawLineResponse {}
+message DrawArcResponse {}
+message DrawCircleResponse {}
+message DrawRectResponse {}
+message BlitArrayResponse {}
+message WriteScreenReponse {}
+message WriteWorldResponse {}
+
+message Point {
+  required int32 x = 1;
+  required int32 y = 2;
+}
+
+message Rectangle {
+  optional Point p0 = 1;
+  optional Point p1 = 2;
+}
+
+message DrawLineRequest {
+  required string color = 1;
+  required Point start_loc = 2;
+  required Point end_loc = 3;
+  optional int32 thickness = 4;
+}
+
+message DrawArcRequest {
+  required string color = 1;
+  required Point world_loc = 2;
+  required int32 world_radius = 3;
+  required int32 start_angle = 4;
+  required int32 stop_angle = 5;
+  optional int32 thickness = 6;
+}
+
+message DrawCircleRequest {
+  required string color = 1;
+  required Point world_loc = 2;
+  required int32 world_radius = 3;
+  optional int32 thickness = 6;
+}
+
+message DrawRectRequest {
+  required string color = 1;
+  required Rectangle world_rect = 2;
+  optional int32 thickness = 3;
+}
+
+message BlitArrayRequest {
+  repeated int32 array = 1;
+}
+
+message WriteScreenReponse {
+  optional string font = 1;
+  optional string color = 2;
+  required Point screen_pos = 3;
+  required string text = 4;
+  optional string align = 5;
+  optional string valign = 6;
+}
+
+message WriteWorldRequest {
+  optional string font = 1;
+  optional string color = 2;
+  required Point world_loc = 3;
+  required string text = 4;
+}
+
+service Surface {
+  rpc DrawLine(DrawLineRequest) returns (DrawLineResponse);
+  rpc DrawArc(DrawArcRequest) returns (DrawArcResponse);
+  rpc DrawCircle(DrawCircleRequest) returns (DrawCircleResponse);
+  rpc DrawRect(DrawRectRequest) returns (DrawRectResponse);
+  rpc BlitArray(BlitArrayRequest) returns (BlitArrayResponse);
+  rpc WriteScreen(WriteScreenRequest) returns (WriteScreenResponse);
+  rpc WriteWorld(WriteWorldRequest) returns (WriteWorldResponse);
+}
