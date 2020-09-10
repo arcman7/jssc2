@@ -12,6 +12,8 @@ const { withPythonAsync } =pythonUtils
 
 // this needs to be done
 // from absl import app
+// import importlib
+// import threading
 
 
 flags.defineBoolean('render', true, 'Whether to render with browser.')
@@ -97,5 +99,20 @@ function run_thread(agent_classes, players, map_name, visualize) {
 
 function main(unused_argv) {
   // Run an agent.
-  if (flags.)
+  if (flags.get('trace')) {
+    stopwatch.sw.trace()
+  } else if (flags.get('profile')) {
+    stopwatch.sw.enable()
+  }
+
+  const map_inst = maps.get(flags.get('map'))
+
+  const agent_classes = []
+  const players = []
+
+  // agent_module, agent_name = FLAGS.agent.rsplit(".", 1)
+  // agent_cls = getattr(importlib.import_module(agent_module), agent_name)
+
+  agent_classes.push(agent_cls)
+  players.push(new sc2_env.Agent(sc2_env.Race[flags.get('agent2_race')], flags.get('agent_name') || agent_name))
 }
