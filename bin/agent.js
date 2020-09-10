@@ -1,6 +1,5 @@
-// Run an agent.
-const path = require('path')
-const flags = require('flags')
+const path = require('path') //eslint-disable-line
+const flags = require('flags') //eslint-disable-line
 const maps = require(path.resolve(__dirname, '..', 'maps'))
 const run_loop = require(path.resolve(__dirname, '..', 'env', 'run_loop.js'))
 const available_actions_printer = require(path.resolve(__dirname, '..', 'env', 'available_actions_printer.js'))
@@ -8,63 +7,62 @@ const sc2_env = require(path.resolve(__dirname, '..', 'env', 'sc2_env.js'))
 const point_flag = require(path.resolve(__dirname, '..', 'lib', 'point_flag.js'))
 const stopwatch = require(path.resolve(__dirname, '..', 'lib', 'stopwatch.js'))
 const pythonUtils = require(path.resolve(__dirname, '..', 'lib', 'pythonUtils.js'))
-const { withPythonAsync } =pythonUtils
+const { withPythonAsync } = pythonUtils
 
-// this needs to be done
-// from absl import app
-// import importlib
-// import threading
+// Run an agent.
 
+flags.defineBool('render', true, 'heter to render with pygame.')
+point_flag.DEFINE_point("feature_screen_size", "84", "Resolution for screen feature layers.")
+point_flag.DEFINE_point("feature_minimap_size", "64", "Resolution for minimap feature layers.")
+point_flag.DEFINE_point("rgb_screen_size", null, "Resolution for rendered screen.")
+point_flag.DEFINE_point("rgb_minimap_size", null, "Resolution for rendered minimap.")
+flags.defineString('action_space', null, `Which action space to use. Needed if you take both feature and rgb observations. Choices:\n${sc2_env.ActionSpace._member_names_.join(' ')}`).setValidator((input) => {
+  if (!sc2_env.Race._member_names_.includes(input) && input !== null) {
+    throw new Error(`action_spacee must be one of:\n${sc2_env.ActionSpace._member_names_.join(' ')}`)
+  }
+})
 
-flags.defineBoolean('render', true, 'Whether to render with browser.')
-point_flag.DEFINE_point('feature_screen_size', '84',
-                        'Resolution for screen feature layers.')
-point_flag.DEFINE_point('feature_minimap_size', '64',
-                        'Resolution for minimap feature layers.')
-point_flag.DEFINE_point('rgb_screen_size', null,
-                        'Resolution for rendered screen.')
-point_flag.DEFINE_point('rgb_minimap_size', null,
-                        'Resolution for rendered minimap.')
-flags.defineStringList('action_space', null, sc2_env.ActionSpace.member_names_, 'Which action space to use. Needed if you take both feature and rgb observations.')
-flags.defineBoolean('use_feature_units', false,
-                  'Whether to include feature units.')
-flags.defineBoolean('use_raw_units', false,
-                  'Whether to include raw units.')
-flags.defineBoolean('disable_fog', false, 'Whether to disable Fog of War.')
-
+flags.defineBool("use_feature_units", false, "Whether to include feature units.")
+flags.defineBool("use_raw_units", false, "Whether to include raw units.")
+flags.defineBool("disable_fog", false, "Whether to disable Fog of War.")
 flags.defineInteger('max_agent_steps', 0, 'Total agent steps.')
 flags.defineInteger('game_steps_per_episode', null, 'Game steps per episode.')
 flags.defineInteger('max_episodes', 0, 'Total episodes.')
 flags.defineInteger('step_mul', 8, 'Game steps per agent step.')
-
-flags.defineString('agent', 'pysc2.agents.random_agent.RandomAgent',
-                    'Which agent to run, as a python path to an Agent class.')
-flags.defineString('agent_name', null,
-                    'Name of the agent in replays. Defaults to the class name.')
-flags.defineStringList('agent_race', 'random', sc2_env.Race.member_names_, 'Agent 1\'s race.')
-
+flags.defineString('agent', 'pysc2.agents.random_agent.RandomAgent', 'Which agent to run, as a python path to an Agent class.')
+flags.defineString('agent_name', null, 'Name of the agent in replays. Defaults to the class name.')
+flags.defineString('agent_race', 'random', `Agent 1's race. Choices:\n ${sc2_env.Race._member_names_.join(' ')}`).setValidator((input) => {
+  if (!sc2_env.Race._member_names_.includes(input)) {
+    throw new Error(`agent_race must be one of:\n${sc2_env.Race._member_names_.join(' ')}`)
+  }
+})
 flags.defineString('agent2', 'Bot', 'Second agent, either Bot or agent class.')
-flags.defineString('agent2_name', null,
-                    'Name of the agent in replays. Defaults to the class name.')
-flags.defineStringList('agent2_race', 'random', sc2_env.Race.member_names_, 'Agent 2\'s race.')
-flags.defineStringList('difficulty', 'very_easy', sc2_env.Difficulty.member_names_, 'If agent2 is a built-in Bot, it\'s strength.')
-flags.defineStringList('bot_build', 'random', sc2_env.BotBuild.member_names_, 'Bot\'s build strategy.')
-
-flags.defineBoolean('profile', false, 'Whether to turn on code profiling.')
-flags.defineBoolean('trace', false, 'Whether to trace the code execution.')
+flags.defineString('agent2_name', null, 'Name of the agent in replays. Defaults to the class name.')
+flags.defineString('agent2_race', 'random', `Agent 2's race. Choices:\n${sc2_env.Race._member_names_.join(' ')}`)
+flags.defineString('difficulty', 'very_easy', `If agent2 is a built-in Bot, it's strength. Choices:\n ${sc2_env.Difficulty._member_names_.join(' ')}`).setValidator((input) => {
+  if (!sc2_env.Race._member_names_.includes(input)) {
+    throw new Error(`difficulty must be one of:\n${sc2_env.Race._member_names_.join(' ')}`)
+  }
+})
+flags.defineString('bot_build', 'random', `${sc2_env.BotBuild._member_names_.join(' ')}`).setValidator((input) => {
+  if (!sc2_env.Race._member_names_.includes(input)) {
+    throw new Error(`bot_build must be one of:\n${sc2_env.Race._member_names_.join(' ')}`)
+  }
+})
+flags.defineBool('profile', false, 'Whether to turn on code profiling.')
+flags.defineBool('trace', false, 'Whether to trace the code execution.')
 flags.defineInteger('parallel', 1, 'How many instances to run in parallel.')
 
-flags.defineBoolean('save_replay', true, 'Whether to save a replay at the end.')
+flags.defineBool('save_replay', true, 'Whether to save a replay at the end.')
 
-flags.defineString('map', null, 'Name of a map to use.')
-flags.defineBoolean('battle_net_map', false, 'Use the battle.net map version.')
+flags.defineString('map', null, 'Name of a map to use.').setValidator((input) => {
+  if (input === null) {
+    throw new Error(`A map is required.`)
+  }
+})
+flags.defineBool('battle_net_map', false, 'Use the battle.net map version.')
 
-// this needs to be done
-//flags.mark_flag_as_required('map')  
-
-
-
-function run_thread(agent_classes, players, map_name, visualize) {
+async function run_thread(agent_classes, players, map_name, visualize) {
   // Run one thread worth of the environment with agents.
   const kwargs = {
     map_name: map_name,
@@ -87,12 +85,12 @@ function run_thread(agent_classes, players, map_name, visualize) {
   await withPythonAsync(sc2_env.SC2EnvFactory(kwargs), async (env) => {
     env = available_actions_printer.AvailableActionsPrinter(env)
     const agents = []
-    agent_classes.forEach((agent_cls) => {
-      agents.push(agent_cls())
+    agent_classes.forEach((Agent_cls) => {
+      agents.push(new Agent_cls())
     })
-    run_loop.run_loop(agents, env, flags.get('max_agent_steps'), flags.get('max_episodes'))
+    await run_loop.run_loop(agents, env, flags.get('max_agent_steps'), flags.get('max_episodes'))
     if (flags.get('save_replay')) {
-      env.save_replay(agent_classes[0].name)
+      await env.save_replay(agent_classes[0].name)
     }
   })
 }
