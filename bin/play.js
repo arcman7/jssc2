@@ -57,7 +57,9 @@ function main(unused_argv) {
   }
 
   if ((flags.get('map') && flags.get('replay')) || (!flags.get('map') && !flags.get('replay'))) {
-    process.exit('')
+    process.on('exit', (code) => {
+      console.log('Must supply either a map or replay.')
+    })
   }
 }
 
