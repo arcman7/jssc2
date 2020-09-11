@@ -1,5 +1,7 @@
-const path = require('path') //eslint-disable-line
-const flags = require('flags') //eslint-disable-line
+const path = require('path')
+const flags = require('flags')
+
+const agents = require(path.resolve(__dirname, '..', 'agents'))
 const maps = require(path.resolve(__dirname, '..', 'maps'))
 const run_loop = require(path.resolve(__dirname, '..', 'env', 'run_loop.js'))
 const available_actions_printer = require(path.resolve(__dirname, '..', 'env', 'available_actions_printer.js'))
@@ -18,7 +20,7 @@ point_flag.DEFINE_point("rgb_screen_size", null, "Resolution for rendered screen
 point_flag.DEFINE_point("rgb_minimap_size", null, "Resolution for rendered minimap.")
 flags.defineString('action_space', null, `Which action space to use. Needed if you take both feature and rgb observations. Choices:\n${sc2_env.ActionSpace._member_names_.join(' ')}`).setValidator((input) => {
   if (!sc2_env.Race._member_names_.includes(input) && input !== null) {
-    throw new Error(`action_spacee must be one of:\n${sc2_env.ActionSpace._member_names_.join(' ')}`)
+    throw new Error(`action_space must be one of:\n${sc2_env.ActionSpace._member_names_.join(' ')}`)
   }
 })
 
@@ -29,7 +31,7 @@ flags.defineInteger('max_agent_steps', 0, 'Total agent steps.')
 flags.defineInteger('game_steps_per_episode', null, 'Game steps per episode.')
 flags.defineInteger('max_episodes', 0, 'Total episodes.')
 flags.defineInteger('step_mul', 8, 'Game steps per agent step.')
-flags.defineString('agent', 'pysc2.agents.random_agent.RandomAgent', 'Which agent to run, as a python path to an Agent class.')
+flags.defineString('agent', 'jssc2.agents.random_agent.RandomAgent', 'Which agent to run, as a python path to an Agent class.')
 flags.defineString('agent_name', null, 'Name of the agent in replays. Defaults to the class name.')
 flags.defineString('agent_race', 'random', `Agent 1's race. Choices:\n ${sc2_env.Race._member_names_.join(' ')}`).setValidator((input) => {
   if (!sc2_env.Race._member_names_.includes(input)) {
@@ -95,7 +97,7 @@ async function run_thread(agent_classes, players, map_name, visualize) {
   })
 }
 
-function main(unused_argv) {
+function main() {
   // Run an agent.
   if (flags.get('trace')) {
     stopwatch.sw.trace()
@@ -108,9 +110,32 @@ function main(unused_argv) {
   const agent_classes = []
   const players = []
 
-  // agent_module, agent_name = FLAGS.agent.rsplit(".", 1)
-  // agent_cls = getattr(importlib.import_module(agent_module), agent_name)
-
+  let temp = flags.get('agent').split('.')
+  // default string value "jssc2.agents.random_agent.RandomAgent"
+  let agent_name = temp.pop()
+  let agent_module = temp.pop()
+  let agent_cls = agents[agent_module][agent_name]
   agent_classes.push(agent_cls)
-  players.push(new sc2_env.Agent(sc2_env.Race[flags.get('agent2_race')], flags.get('agent_name') || agent_name))
+  players.push(new sc2_env.Agent(sc2_env.Race[flags.get('agent_race')], flags.get('agent_name') || agent_name))
+
+  if (map_inst.players >= 2) {
+    if (flags.get('agent2') === 'Bot') {
+      players.push(sc2_env.Bot(
+        sc2_env.Race[flags.get('agent2_race')],
+        sc2_env.Difficulty[flags.get('difficulty')],
+        sc2_env.BotBuild[flags.get('bot_build')]
+      ))
+    }
+  } else {
+    temp = flags.get('agent2').split('.')
+    agent_name = temp.pop()
+    agent_module = temp.pop()
+    agent_cls = agents[agent_module][agent_name]
+    players.push(sc2_env.Agent(
+      sc2_env.Race[flags.get('agent2_race')],
+      flags.get('agent2_name') || agent_name
+    ))
+  }
 }
+
+main()
