@@ -50,12 +50,5 @@ module.exports = {
         "jest": true
     },
     "globals": {
-    },
-    "settings": {
-        "import/resolver": {
-            "webpack": {
-                "config": "build/webpack.dev.config.js"
-            }
-        }
     }
 };
