@@ -325,7 +325,7 @@ class SC2Env extends environment.Base {
     }
 
     if (visualize) {
-      this._renderer_human = new renderer_human.InitalizeServices()
+      this._renderer_human = new renderer_human.InitializeServices()
       this._renderer_human.setUp(
         this._run_config,
         this._controllers[0]
