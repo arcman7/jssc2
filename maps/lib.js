@@ -118,9 +118,10 @@ class Map {
 
   toString() {
     return [
+      this.name,
       this.path ? ` file: ${this.path}` : null,
       this.battle_net ? ` battle_net: ${this.battle_net}` : null,
-      ` players: ${this.players}, score_index: ${this.score_index}, score_multiplier: ${this.score_multiplier}\n\tstep_mul: ${this.step_mul}, game_steps_per_episode: ${this.game_steps_per_episode}`,
+      ` players: ${this.players}, score_index: ${this.score_index}, score_multiplier: ${this.score_multiplier} \n step_mul: ${this.step_mul}, game_steps_per_episode: ${this.game_steps_per_episode}`,
     ].filter((str) => str !== null).join('\n')
   }
 
