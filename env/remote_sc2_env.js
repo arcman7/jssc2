@@ -130,7 +130,6 @@ class RemoteSC2Env extends sc2_env.SC2Env {
     this._discount_zero_after_timeout = false
 
     this._run_config = run_configs.get()
-    this._parallel = run_parallel.RunParallel() // Needed for multiplayer.
     this._in_game = false
     this._action_delay_fns = [null]
 
