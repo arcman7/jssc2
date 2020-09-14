@@ -1,6 +1,7 @@
 const path = require('path')
 const flags = require('flags')
-
+// const { fork } = require('child_process')
+const { ThreadWrapper } = require(path.resolve(__dirname, 'thread_wrapper.js'))
 const agents = require(path.resolve(__dirname, '..', 'agents'))
 const maps = require(path.resolve(__dirname, '..', 'maps'))
 const run_loop = require(path.resolve(__dirname, '..', 'env', 'run_loop.js'))
@@ -64,10 +65,43 @@ flags.defineString('map', null, 'Name of a map to use.').setValidator((input) =>
 })
 flags.defineBool('battle_net_map', false, 'Use the battle.net map version.')
 
+function getAllAgentFlags() {
+  return {
+    render: flags.get('render'),
+    feature_screen_size: flags.get('feature_screen_size'),
+    feature_minimap_size: flags.get('feature_minimap_size'),
+    rgb_screen_size: flags.get('rgb_screen_size'),
+    rgb_minimap_size: flags.get('rgb_minimap_size'),
+    action_space: flags.get('action_space'),
+    use_feature_units: flags.get('use_feature_units'),
+    use_raw_units: flags.get('use_raw_units'),
+    disable_fog: flags.get('disable_fog'),
+    max_agent_steps: flags.get('max_agent_steps'),
+    game_steps_per_episodes: flags.get('game_steps_per_episode'),
+    max_episodes: flags.get('max_episodes'),
+    step_mul: flags.get('step_mul'),
+    agent: flags.get('agent'),
+    agent_name: flags.get('agent_name'),
+    agent_race: flags.get('agent_race'),
+    agent2: flags.get('agent2'),
+    agent2_name: flags.get('agent2_name'),
+    agent2_race: flags.get('agent2_race'),
+    difficulty: flags.get('difficulty'),
+    bot_build: flags.get('bot_build'),
+    profile: flags.get('profile'),
+    trace: flags.get('trace'),
+    parallel: flags.get('parallel'),
+    save_replay: flags.get('save_replay'),
+    map: flags.get('map'),
+    battle_net_map: flags.get('battle_net_map'),
+  }
+}
+
+// method is duplicated in agent_run_thread.js
 async function run_thread(agent_classes, players, map_name, visualize) {
   // Run one thread worth of the environment with agents.
   const kwargs = {
-    map_name: map_name,
+    map_name,
     battle_net_map: flags.get('battle_net_map'),
     players: players,
     agent_interface_format: sc2_env.parse_agent_interface_format({
@@ -86,25 +120,26 @@ async function run_thread(agent_classes, players, map_name, visualize) {
   }
   await withPythonAsync(sc2_env.SC2EnvFactory(kwargs), async (env) => {
     env = available_actions_printer.AvailableActionsPrinter(env)
-    const agents = []
+    const usedAgents = []
     agent_classes.forEach((Agent_cls) => {
-      agents.push(new Agent_cls())
+      usedAgents.push(new Agent_cls())
     })
-    await run_loop.run_loop(agents, env, flags.get('max_agent_steps'), flags.get('max_episodes'))
+    await run_loop.run_loop(usedAgents, env, flags.get('max_agent_steps'), flags.get('max_episodes'))
     if (flags.get('save_replay')) {
       await env.save_replay(agent_classes[0].name)
     }
   })
 }
 
-function main() {
+async function main() {
+  flags.parse()
   // Run an agent.
   if (flags.get('trace')) {
     stopwatch.sw.trace()
   } else if (flags.get('profile')) {
     stopwatch.sw.enable()
   }
-
+  // duplicated code (agent_run_thread.js) - start
   const map_inst = maps.get(flags.get('map'))
 
   const agent_classes = []
@@ -136,6 +171,29 @@ function main() {
       flags.get('agent2_name') || agent_name
     ))
   }
+
+  // duplicated code - end
+
+  const threads = []
+  for (let _ = 0; _ < flags.get('parallel') - 1; _++) {
+    const thread = new ThreadWrapper('agent_run_thread.js')
+    await thread.ready()
+    await thread.start(getAllAgentFlags())
+    threads.push(thread)
+  }
+
+  await run_thread(agent_classes, players, flags.get('map'), flags.get('render'))
+  if (flags.get('profile')) {
+    console.log(stopwatch.sw.toString())
+  }
 }
 
-main()
+flags.defineBool('m', false, 'treat file as module')
+flags.parse()
+if (flags.get('m')) {
+  module.exports = {
+    main,
+  }
+} else {
+  main()
+}
