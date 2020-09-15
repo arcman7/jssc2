@@ -1,5 +1,7 @@
-const path = require('path') //eslint-disable-line
-const { performance } = require('perf_hooks') //eslint-disable-line
+const path = require('path')
+const { performance } = require('perf_hooks')
+const tf = require('@tensorflow/tfjs-node')
+
 const pythonUtils = require(path.resolve(__dirname, '..', 'lib', 'pythonUtils.js'))
 const { zip } = pythonUtils
 
@@ -40,6 +42,7 @@ async function run_loop(agents, env, max_frames = 0, max_episodes = 0) {
         }
         timesteps = await env.step(actions)
       }
+      await tf.tidy(() => {})
     }
   } catch (err) {
     //If keyboard interrupt do nothing
