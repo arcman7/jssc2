@@ -33,6 +33,9 @@ const run_loop = require(path.resolve(__dirname, '..', 'env', 'run_loop.js'))
 const sc2_env = require(path.resolve(__dirname, '..', 'env', 'sc2_env.js'))
 const point_flag = require(path.resolve(__dirname, '..', 'lib', 'point_flag.js'))
 const renderer_human = require(path.resolve(__dirname, '..', 'lib', 'renderer_human', 'backend.js'))
+const agents = require(path.resolve(__dirname, '..', 'agents'))
+const pythonUtils = require(path.resovle(__dirname, '..', 'lib','pythonUtils.js'))
+const { withPythonAsync } = pythonUtils
 const sc_pb = s2clientprotocol.sc2api_pb
 
 flags.defineBoolean('render', os.platform() == 'linux', 'Whether to render with pygame.')
@@ -72,10 +75,66 @@ flags.defineBoolean('human', false, 'Whether to host a game as a human.')
 
 async function agent() {
   // Run the agent, connecting to a (remote) host started independently.
-  
+  const agent_list = flags.get('agent').split('.')
+  const agent_name = agent_list.pop()
+  const agent_module = agent_list.pop()
+  const agent_cls = agents[agent_module][agent_name]
+
+  console.log('Starting agent:')
+  const kwargs = {
+    host: flags.get('host'),
+    config_port: flags.get('config_port'),
+    race: sc2_env.Race[flags.get('agent_race')],
+    step_mul: flags.get('step_mul'),
+    realtime: flags.get('realtime'),
+    agent_interface_format: sc2_env.parse_agent_interface_format({
+      feature_screen: flags.get('feature_screen_size'),
+      feature_minimap: flags.get('feature_minimap_size'),
+      rgb_screen: flags.get('rgb_screen_size'),
+      rgb_minimap: flags.get('rgb_minimap_size'),
+      action_space: flags.get('action_space'),
+      use_unit_counts: true,
+      use_camera_position: true,
+      show_cloaked: true,
+      show_burrowed_shadows: true,
+      show_placeholders: true,
+      send_observation_proto: true,
+      crop_to_playable_area: true,
+      raw_crop_to_playable_area: true,
+      allow_cheating_layers: true,
+      add_cargo_to_units: true,
+      use_feature_units: flags.get('use_feature_units')
+    }),
+    visualize: flags.get('render')
+  }
+  await withPythonAsync(lan_sc2_env.LanSC2EnvFactory(kwargs), async (env) => {
+    const agentss = [new agent_cls()]
+    console.info('Connected, starting run_loop.')
+    try {
+      await run_loop.run_loop(agentss, env)
+    } catch (err) {
+      console.error('restart Error', err)
+    }
+  })
+  console.info('Done.')
 }
 
 function human() {
+  // Run a host which expects one player to connect remotely.
+  const run_config = run_configs.get()
+  const map_inst = maps.get(flags.get('map'))
+
+  if (!flags.get('rgb_screen_size') || ! flags.get('rgb_minimap_size')) {
+    console.info('Use --rgb_screen_size and --rgb_minimap_size if you want rgb obervations.')
+  }
+
+  const ports = []
+  for (let p = 0; p < 5; p += 1) {
+    ports.push(flags.get('config_port') + p)
+  }
+  if (!) {
+    
+  }
 
 }
 
