@@ -6,7 +6,7 @@ class AvailableActionsPrinter extends base_env_wrapper.BaseEnvWrapper {
   constructor(env) {
     super(env)
     this._seen = new Set()
-    this._action_spec = this._action_spec()[0]
+    this._action_spec = this.action_spec()[0]
   }
 
   step() {

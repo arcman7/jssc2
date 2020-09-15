@@ -4,7 +4,7 @@ const environment = require(path.resolve(__dirname, './environment.js'))
 class BaseEnvWrapper extends environment.Base {
   /*A base env wrapper so we don't need to override everything every time.*/
   constructor(env) {
-    super(env)
+    super()
     this._env = env
   }
 

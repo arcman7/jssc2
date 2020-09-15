@@ -107,7 +107,7 @@ class ThreadWrapper {
   }
 
   close() {
-    e
+    return this._shutdown()
   }
 
   status() {//eslint-disable-line
