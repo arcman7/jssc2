@@ -229,6 +229,12 @@ async function human() {
       // renderer = renderer_human.RendererHuman(fps=FLAGS.fps, render_feature_grid=False)
       // renderer.run(run_configs.get(), controller, max_episodes=1)
       const renderer = new renderer_human.InitializeServices()
+      renderer.setUp(run_config, controller)
+      await renderer_human.GameLoop.run({
+        run_config: run_configs.get(),
+        controller: controller,
+        max_episodes: 1
+      })
     } else {
       while (true) {
         const frame_start_time = performance.now() / 1000
@@ -240,7 +246,8 @@ async function human() {
         if (obs.player_result) {
           break
         }
-        // time.sleep(max(0, frame_start_time - time.time() + 1 / FLAGS.fps))
+        const sleeptime = Math.max(0, frame_start_time - performance.now() / 1000 + 1 / flags.get('fps'))
+        await new Promise((resolve) => setTimeout(resolve, sleeptime))
       }
     }
   } catch (err) {
@@ -261,7 +268,7 @@ async function human() {
         if (ssh_proc.poll() !== null) {
           break
         }
-        // time.sleep(1)
+        await new Promise((resolve) => setTimeout(resolve, 1000))
       }
       if (ssh_proc.poll() !== null) {
         await ssh_proc.kill()
@@ -278,7 +285,6 @@ function main() {
     agent()
   }
 }
-
 
 flags.defineBool('m', false, 'treat file as module')
 flags.parse()
