@@ -229,7 +229,6 @@ async function human() {
       // renderer = renderer_human.RendererHuman(fps=FLAGS.fps, render_feature_grid=False)
       // renderer.run(run_configs.get(), controller, max_episodes=1)
       const renderer = new renderer_human.InitializeServices()
-
     } else {
       while (true) {
         const frame_start_time = performance.now() / 1000
@@ -241,15 +240,35 @@ async function human() {
         if (obs.player_result) {
           break
         }
-        
+        // time.sleep(max(0, frame_start_time - time.time() + 1 / FLAGS.fps))
       }
     }
-
-
   } catch (err) {
-
+    console.log(err)
+  } finally {
+    if (tcp_conn) {
+      await tcp_conn.close()
+    }
+    if (proc) {
+      await proc.close()
+    }
+    if (udp_sock) {
+      await udp_sock.close()
+    }
+    if (ssh_proc) {
+      await ssh_proc.terminate()
+      for (let _ = 0; _ < 5; _ += 1) {
+        if (ssh_proc.poll() !== null) {
+          break
+        }
+        // time.sleep(1)
+      }
+      if (ssh_proc.poll() !== null) {
+        await ssh_proc.kill()
+        await ssh_proc.wait()
+      }
+    }
   }
-
 }
 
 function main() {
