@@ -34,7 +34,8 @@ const sc2_env = require(path.resolve(__dirname, '..', 'env', 'sc2_env.js'))
 const point_flag = require(path.resolve(__dirname, '..', 'lib', 'point_flag.js'))
 const renderer_human = require(path.resolve(__dirname, '..', 'lib', 'renderer_human', 'backend.js'))
 const agents = require(path.resolve(__dirname, '..', 'agents'))
-const pythonUtils = require(path.resovle(__dirname, '..', 'lib','pythonUtils.js'))
+const pythonUtils = require(path.resovle(__dirname, '..', 'lib', 'pythonUtils.js'))
+const portspicker = require(path.resolve(__dirname, '..', 'lib', 'portspicker.js'))
 const { withPythonAsync } = pythonUtils
 const sc_pb = s2clientprotocol.sc2api_pb
 
@@ -119,21 +120,134 @@ async function agent() {
   console.info('Done.')
 }
 
-function human() {
+async function human() {
   // Run a host which expects one player to connect remotely.
   const run_config = run_configs.get()
   const map_inst = maps.get(flags.get('map'))
 
-  if (!flags.get('rgb_screen_size') || ! flags.get('rgb_minimap_size')) {
+  if (!flags.get('rgb_screen_size') || !flags.get('rgb_minimap_size')) {
     console.info('Use --rgb_screen_size and --rgb_minimap_size if you want rgb obervations.')
   }
-
-  const ports = []
+  let ports = []
   for (let p = 0; p < 5; p += 1) {
     ports.push(flags.get('config_port') + p)
   }
-  if (!) {
-    
+  try {
+    ports = await Promise.all(ports)
+  } catch (err) {
+    throw Error('Need 5 free ports after the config port.')
+  }
+
+  let proc = null
+  let ssh_proc = null
+  let tcp_conn = null
+  let udp_sock = null
+  try {
+    proc = await run_config.start({
+      extra_ports: ports.slice(1, ports.length),
+      timeout_seconds: 300,
+      host: flags.get('host'),
+      window_loc: [50, 50]
+    })
+    const tcp_port = ports[0]
+    const settings = {
+      'remote': flags.get('remote'),
+      'game_version': proc.version.game_version,
+      'realtime': flags.get('realtime'),
+      'map_name': map_inst.name,
+      'map_path': map_inst.path,
+      'map_data': map_inst.data(run_config),
+      'ports': {
+        'server': { 'game': ports[1], 'base': ports[2] },
+        'client': { 'game': ports[3], 'base': ports[4] },
+      }
+    }
+    const create = new sc_pb.RequestCreateGame()
+    create.setRealtime(settings['realtime'])
+    const localmap = new sc_pb.LocalMap()
+    localmap.setMapPath(settings['map_path'])
+    create.setLocalMap(localmap)
+    const controller = proc.controller
+    await controller.save_map(settings['map_path'], settings['map_data'])
+    await controller.create_game(create)
+
+    if (flags.get('remote')) {
+      ssh_proc = lan_sc2_env.forward_ports(flags.get('remote'), proc.host, [settings['ports']['client']['base']], [settings['ports']]['server']['base'])
+    }
+
+    console.log('-'.repeat(80))
+    console.log(`Join: play_vs_agent -- ${proc.host} --config_port ${tcp_port}`)
+    console.log('-'.repeat(80))
+
+    tcp_conn = lan_sc2_env.tcp_server(new lan_sc2_env.Addr(proc.host, tcp_port), settings)
+
+    if (flags.get('remote')) {
+      udp_sock = lan_sc2_env.udp_sever(new lan_sc2_env.Addr(proc.host, settings['ports']['client']['game']))
+      // need to be fixed
+      // lan_sc2_env.daemon_thread(lan_sc2_env.udp_to_tcp, (udp_sock, tcp_conn))
+    }
+    const join = new sc_pb.RequestJoinGame()
+    join.setSharedPort(0)
+    const portset = new sc_pb.PortSet()
+    portset.setGamePort(settings['ports']['server']['game'])
+    portset.setBasePort(settings['ports']['server']['base'])
+    join.setServerPorts(portset)
+    join.addClientPort(portset)
+    join.setRace(sc2_env.Race[flags.get('user_race')])
+    join.setPlayerName(flags.get('user_name'))
+
+    if (flags.get('render')) {
+      const interfaceoptions = new sc_pb.InterfaceOptions()
+      interfaceoptions.setRaw(true)
+      interfaceoptions.setScore(true)
+      interfaceoptions.setRawAffectsSelection(true)
+      interfaceoptions.setRawCropToPlayableArea(true)
+      interfaceoptions.setShowBurrowedShadows(true)
+      interfaceoptions.setShowCloaked(true)
+      interfaceoptions.setShowPlaceholders(true)
+      join.setOptions(interfaceoptions)
+      if (flags.get('feature_screen_size') && flags.get('feature_minimap_size')) {
+        const featurelayer = new sc_pb.SpatialCameraSetup()
+        interfaceoptions.setFeatureLayer(featurelayer)
+        join.setOptions(interfaceoptions)
+        const fl = join.getOptions().getFeatureLayer()
+        fl.setWidth(24)
+        flags.get('feature_screen_size').assign_to(fl.getResolution())
+        flags.get('feature_minimap_size').assign_to(fl.getMinimapResolution())
+      }
+      if (flags.get('rgb_screen_size') && flags.get('rgb_minimap_size')) {
+        const render = new sc_pb.SpatialCameraSetup()
+        interfaceoptions.setRender(render)
+        join.setOptions(interfaceoptions)
+        flags.get('rgb_screen_size').assign_to(join.getOptions().getRender().getResolution())
+        flags.get('rgb_minimap_size').assign_to(join.getOptions().getRender().getMinimapResolution())
+      }
+    }
+    await controller.join_game(join)
+
+    if (flags.get('render')) {
+      // renderer = renderer_human.RendererHuman(fps=FLAGS.fps, render_feature_grid=False)
+      // renderer.run(run_configs.get(), controller, max_episodes=1)
+      const renderer = new renderer_human.InitializeServices()
+
+    } else {
+      while (true) {
+        const frame_start_time = performance.now() / 1000
+        if (!flags.get('realtime')) {
+          await controller.step()
+        }
+        const obs = await controller.observe()
+
+        if (obs.player_result) {
+          break
+        }
+        
+      }
+    }
+
+
+  } catch (err) {
+
   }
 
 }
