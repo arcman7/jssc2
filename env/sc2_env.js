@@ -190,7 +190,7 @@ class SC2Env extends environment.Base {
       ValueError: if the resolutions aren't specified correctly.
     */
     super()
-
+    console.log('CONSTRUCTOR SC2ENV')
     if (_only_use_kwargs) {
       throw new ValueError('All arguments must be passed as keyword arguments.')
     }
