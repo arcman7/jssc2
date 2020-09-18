@@ -18,9 +18,9 @@
   "main": "jssc2/jssc2.bundle.js",
   "scripts": {
     "jssc2_agent": "node bin/agent.js",
-    "jssc2_play": "npm run jssc2.bin.play:entry_point",
-    "jssc2_replay_info": "npm run jssc2.bin.replay_info:entry_point",
-    "tests": "jest --colors",
+    "jssc2_play": "node bin/play.js",
+    "jssc2_replay_info": "node bin/replay_info.js",
+    "test": "jest --colors",
     "build_launch_renderer": "cd jssc2/lib && browserify -r ./renderer_human/tensorflow_stub.js:@tensorflow/tfjs -r ./renderer_human/tensorflow_backend_stub.js:@tensorflow/tfjs-node -r s2clientprotocol -r gamejs -r ./pythonUtils.js -r ./numpy.js -r ./named_array.js -r ./static_data.js -r ./stopwatch.js -r ./point.js -r ./colors.js -r ./transform.js -r ./actions.js -r ./features.js -r ./protocol.js -r ./renderer_human.js > ./renderer_human/bundle.js && node renderer_human.test.js"
   },
   "dependencies": {
@@ -63,7 +63,9 @@
     "modulePathIgnorePatterns": [
       ".git",
       "/tests/",
-      "renderer_human"
+      "/bin/",
+      "renderer_human",
+      "stopwatch_memleak_check"
     ]
   }
 }
