@@ -64,7 +64,8 @@
       ".git",
       "/tests/",
       "/bin/",
-      "renderer_human"
+      "renderer_human",
+      "stopwatch_memleak_check"
     ]
   }
 }
