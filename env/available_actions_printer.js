@@ -6,13 +6,14 @@ class AvailableActionsPrinter extends base_env_wrapper.BaseEnvWrapper {
   constructor(env) {
     super(env)
     this._seen = new Set()
-    this._action_spec = this._action_spec()[0]
+    this._action_spec = this.action_spec()[0]
   }
 
   step() {
     const all_obs = super.step(...arguments) //eslint-disable-line
     Object.keys(all_obs).forEach((key) => {
       const obs = all_obs[key]
+      console.log('obs.observation["available_actions"]: ', obs.observation["available_actions"])
       Object.keys(obs.observation["available_actions"]).forEach((key1) => {
         const avail = obs.observation["available_actions"][key1]
         if (!(this._seen.has(avail))) {

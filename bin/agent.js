@@ -7,8 +7,7 @@ const maps = require(path.resolve(__dirname, '..', 'maps'))
 const run_loop = require(path.resolve(__dirname, '..', 'env', 'run_loop.js'))
 const available_actions_printer = require(path.resolve(__dirname, '..', 'env', 'available_actions_printer.js'))
 const sc2_env = require(path.resolve(__dirname, '..', 'env', 'sc2_env.js'))
-const point = require(path.resolve(__dirname, '..', 'lib', 'point.js'))
-// const point_flag = require(path.resolve(__dirname, '..', 'lib', 'point_flag.js'))
+const point_flag = require(path.resolve(__dirname, '..', 'lib', 'point_flag.js'))
 const stopwatch = require(path.resolve(__dirname, '..', 'lib', 'stopwatch.js'))
 const pythonUtils = require(path.resolve(__dirname, '..', 'lib', 'pythonUtils.js'))
 const { withPythonAsync } = pythonUtils
@@ -17,13 +16,9 @@ const { withPythonAsync } = pythonUtils
 
 flags.defineBoolean('render', true, 'heter to render with pygame.')
 flags.defineStringList('feature_screen_size', '84', 'Resolution for screen feature layers.')
-// point_flag.DEFINE_point("feature_screen_size", "84", "Resolution for screen feature layers.")
 flags.defineStringList('feature_minimap_size', '64', 'Resolution for minimap feature layers.')
-// point_flag.DEFINE_point('feature_minimap_size', '64', 'Resolution for minimap feature layers.')
 flags.defineStringList('rgb_screen_size', null, 'Resolution for rendered screen.')
-// point_flag.DEFINE_point('rgb_screen_size', null, 'Resolution for rendered screen.')
 flags.defineStringList('rgb_minimap_size', null, 'Resolution for rendered minimap.')
-// point_flag.DEFINE_point('rgb_minimap_size', null, 'Resolution for rendered minimap.')
 flags.defineString('action_space', null, `Which action space to use. Needed if you take both feature and rgb observations. Choices:\n${sc2_env.ActionSpace.member_names_.join(' ')}`).setValidator((input) => {
   if (!sc2_env.Race.member_names_.includes(input) && input !== null) {
     throw new Error(`action_space must be one of:\n${sc2_env.ActionSpace.member_names_.join(' ')}`)
@@ -69,14 +64,14 @@ flags.defineString('map', null, 'Name of a map to use.').setValidator((input) =>
   }
 })
 flags.defineBoolean('battle_net_map', false, 'Use the battle.net map version.')
-
+const pp = point_flag.PointParser.parse
 function getAllAgentFlags() {
   return {
     render: flags.get('render'),
-    feature_screen_size: flags.get('feature_screen_size'),
-    feature_minimap_size: flags.get('feature_minimap_size'),
-    rgb_screen_size: flags.get('rgb_screen_size'),
-    rgb_minimap_size: flags.get('rgb_minimap_size'),
+    feature_screen_size: pp(flags.get('feature_screen_size')),
+    feature_minimap_size: pp(flags.get('feature_minimap_size')),
+    rgb_screen_size: pp(flags.get('rgb_screen_size')),
+    rgb_minimap_size: pp(flags.get('rgb_minimap_size')),
     action_space: flags.get('action_space'),
     use_feature_units: flags.get('use_feature_units'),
     use_raw_units: flags.get('use_raw_units'),
@@ -110,11 +105,10 @@ async function run_thread(agent_classes, players, map_name, visualize) {
     battle_net_map: flags.get('battle_net_map'),
     players: players,
     agent_interface_format: sc2_env.parse_agent_interface_format({
-      feature_screen: flags.get('feature_screen_size')
-        .map((str) => new point.Point(Number(str))),
-      feature_minimap: flags.get('feature_minimap_size'),
-      rgb_screen: flags.get('rgb_screen_size'),
-      rgb_minimap: flags.get('rgb_minimap_size'),
+      feature_screen: pp(flags.get('feature_screen_size')),
+      feature_minimap: pp(flags.get('feature_minimap_size')),
+      rgb_screen: pp(flags.get('rgb_screen_size')),
+      rgb_minimap: pp(flags.get('rgb_minimap_size')),
       action_space: flags.get('action_space'),
       use_feature_units: flags.get('use_feature_units'),
       use_raw_units: flags.get('use_raw_units'),
@@ -125,7 +119,7 @@ async function run_thread(agent_classes, players, map_name, visualize) {
     visualize: visualize
   }
   await withPythonAsync(sc2_env.SC2EnvFactory(kwargs), async (env) => {
-    env = available_actions_printer.AvailableActionsPrinter(env)
+    env = new available_actions_printer.AvailableActionsPrinter(env)
     const usedAgents = []
     agent_classes.forEach((Agent_cls) => {
       usedAgents.push(new Agent_cls())
@@ -180,13 +174,13 @@ async function main() {
 
   // duplicated code - end
 
-  const threads = []
-  for (let _ = 0; _ < flags.get('parallel') - 1; _++) {
-    const thread = new ThreadWrapper('agent_run_thread.js')
-    await thread.ready()
-    await thread.start(getAllAgentFlags())
-    threads.push(thread)
-  }
+  // const threads = []
+  // for (let _ = 0; _ < flags.get('parallel') - 1; _++) {
+  //   const thread = new ThreadWrapper('agent_run_thread.js')
+  //   await thread.ready
+  //   await thread.start(getAllAgentFlags())
+  //   threads.push(thread)
+  // }
 
   await run_thread(agent_classes, players, flags.get('map'), flags.get('render'))
   if (flags.get('profile')) {

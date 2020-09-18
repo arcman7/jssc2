@@ -30,6 +30,33 @@ function _shutdown_proc(p, timeout) {
 class ThreadWrapper {
   constructor(file_path, timeout = 100) {
     const f = fork(file_path)
+    // f.on('message', (msg) => {
+    //   console.log('f.on message => msg:', msg)
+    //   f._hasExited = false
+    // })
+    // f.stdout.on('data', (data) => {
+    //   console.log('f.stdout.on data:', data)
+    //   f._hasExited = false
+    // })
+    // f.stderr.on('data', (data) => {
+    //   console.error('f.stderr.on data: ', data)
+    // })
+    // f.on('exit', () => {
+    //   this._f_exited = true
+    //   f._hasExited = true
+    // })
+    // f.on('data', (data) => {
+    //   console.log('f.on data:', data)
+    //   f._hasExited = false
+    // })
+    // f.on('data', (data) => {
+    //   console.error('f.on data: ', data)
+    // })
+    // f.on('error', (err) => {
+    //   console.error('f.on error => err: ', err)
+    //   this._f_exited = true
+    //   f._hasExited = true
+    // })
     this._fork = f
     this.ready = false
     this.timeout = timeout
@@ -74,6 +101,7 @@ class ThreadWrapper {
     })
     let timer
     function listenStart(msg) {
+      console.log('listenStart, msg: ', msg)
       if (msg === 'started') {
         resolve(self)
       }
@@ -107,7 +135,7 @@ class ThreadWrapper {
   }
 
   close() {
-    e
+    return this._shutdown()
   }
 
   status() {//eslint-disable-line
