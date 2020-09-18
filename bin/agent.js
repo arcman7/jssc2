@@ -7,7 +7,6 @@ const maps = require(path.resolve(__dirname, '..', 'maps'))
 const run_loop = require(path.resolve(__dirname, '..', 'env', 'run_loop.js'))
 const available_actions_printer = require(path.resolve(__dirname, '..', 'env', 'available_actions_printer.js'))
 const sc2_env = require(path.resolve(__dirname, '..', 'env', 'sc2_env.js'))
-const point = require(path.resolve(__dirname, '..', 'lib', 'point.js'))
 const point_flag = require(path.resolve(__dirname, '..', 'lib', 'point_flag.js'))
 const stopwatch = require(path.resolve(__dirname, '..', 'lib', 'stopwatch.js'))
 const pythonUtils = require(path.resolve(__dirname, '..', 'lib', 'pythonUtils.js'))
@@ -175,13 +174,13 @@ async function main() {
 
   // duplicated code - end
 
-  const threads = []
-  for (let _ = 0; _ < flags.get('parallel') - 1; _++) {
-    const thread = new ThreadWrapper('agent_run_thread.js')
-    await thread.ready
-    await thread.start(getAllAgentFlags())
-    threads.push(thread)
-  }
+  // const threads = []
+  // for (let _ = 0; _ < flags.get('parallel') - 1; _++) {
+  //   const thread = new ThreadWrapper('agent_run_thread.js')
+  //   await thread.ready
+  //   await thread.start(getAllAgentFlags())
+  //   threads.push(thread)
+  // }
 
   await run_thread(agent_classes, players, flags.get('map'), flags.get('render'))
   if (flags.get('profile')) {
