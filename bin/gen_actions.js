@@ -7,10 +7,11 @@ const maps = require(path.resolve(__dirname, '..', 'maps'))
 const run_configs = require(path.resolve(__dirname, '..', 'run_configs'))
 const static_data = require(path.resolve(__dirname, '..', 'lib', 'static_data.js'))
 const portspicker = require(path.resolve(__dirname, '..', 'lib', 'portspicker.js'))
+const pythonUtils = require(path.resolve(__dirname, '..', 'lib', 'pythonUtils.js'))
+const { getattr } = pythonUtils
 const sc_common = s2clientprotocol.common_pb
 const sc_data = s2clientprotocol.data_pb
 const sc_pb = s2clientprotocol.sc2api_pb
-
 
 flags.defineString('command', null, `What to generate. Choices: ['csv', 'python']`).setValidator((input) => {
   if (input == null) {
@@ -25,9 +26,19 @@ const cancel_slot = [313, 1039, 305, 307, 309, 1832, 1834, 3672]
 const unload_unit = [410, 415, 397, 1440, 2373, 1409, 914, 3670]
 const skip_abilities = cancel_slot.concat(unload_unit).concat(frivolous)
 
-// function iteritems(d, **kw) {
-//     return iter(d.items(**kw))
-// }
+function generate_name(ability) {
+  return [ability.friendlyName || ability.buttonName || ability.linkName]
+}
+
+function sort_key(data, ability) {
+  // Alphabetical, with specifics immediately after their generals.
+  let name = generate_name(ability)
+  if (ability.remapsToAbilityId) {
+    const general = data.abilities[ability.remapsToAbilityId]
+    name = `${generate_name(general)} ${name}`
+  }
+  return name
+}
 
 async function get_data() {
   // Retrieve static data from the game.
@@ -54,51 +65,113 @@ async function get_data() {
   const interfaceoptions = new sc_pb.InterfaceOptions()
   interfaceoptions.setRaw(true)
   join.setOptions(interfaceoptions)
-
   await controller.create_game(create)
   await controller.join_game(join)
+  const data = await controller.data()
   await controller.quit()
   await controller.close()
-  return controller.data()
+  return data
 }
 
-function generate_name(ability) {
-  return [ability.friendly_name || ability.button_name || ability.link_name]
-}
-
-function sort_key(data, ability) {
-  // Alphabetical, with specifics immediately after their generals.
-  let name = generate_name(ability)
-  if (ability.remaps_to_abililty_id) {
-    const general = data.abilities[ability.remaps_to_ability_id]
-    name = `${generate_name(general)} ${name}`
+function check_mismatch(ability, parent, attr) {
+  if (getattr(ability, attr) !== getattr(parent, attr)) {
+    return `${attr}: ${getattr(ability, attr)}`
   }
-  return name
 }
 
 function generate_csv(data) {
   // Generate a CSV of the abilities for easy commenting.
-  console.log(['ability_id', 'link_name', 'link_index', 'button_name', 'hotkey', 'friendly_name', 'remap_to', 'mismatch'].join(','))
+  console.log(['abilityId', 'linkName', 'linkIndex', 'buttonName', 'hotkey', 'friendlyName', 'remapTo', 'mismatch'].join(','))
+  const abilities = Object.values(data.abilities).sort((a, b) => (sort_key(data, a) > sort_key(data, b)) ? 1 : -1)
+  abilities.forEach((key) => {
+    const ability = abilities[key]
+    const ab_id = ability.abilityId
+    if (skip_abilities.includes(ab_id) || (!data.general_abilities.includes(ab_id) && !used_abilities.includes(ab_id))) {
+      return
+    }
 
+    let general = ''
+    if (data.general_abilities.includes(ab_id)) {
+      general = 'general'
+    } else if (ability.remapsToAbilityId) {
+      general = ability.remapsToAbilityId
+    }
+    let mismatch = ''
+    if (ability.remapsToAbilityId) {
+      const parent = data.abilities[ability.remapsToAbilityId]
+      mismatch = [
+        check_mismatch(ability, parent, 'available'),
+        check_mismatch(ability, parent, 'target'),
+        check_mismatch(ability, parent, 'allowMinimap'),
+        check_mismatch(ability, parent, 'allowAutocast'),
+        check_mismatch(ability, parent, 'isBuilding'),
+        check_mismatch(ability, parent, 'footprintRadius'),
+        check_mismatch(ability, parent, 'isInstantPlacement'),
+        check_mismatch(ability, parent, 'castRange'),
+      ].filter((v) => v !== null || v !== undefined).join('; ')
+    }
+    console.log([
+      ability.abilityID,
+      ability.linkName,
+      ability.linkIndex,
+      ability.buttonName,
+      ability.hotkey,
+      ability.friendlyName,
+      general,
+      mismatch,
+    ].map((v) => String(v))).join(',')
+  })
 }
 
-function generate_py_ability(data) {
+function print_action(func_id, name, func, ab_id, general_id) {
+  const args = [func_id, `"${name}"`, func, ab_id]
+  if (general_id) {
+    args.push(general_id)
+  }
+  const print = []
+  for (let i = 0; i < args.length; i += 1) {
+    print.push(String(args[i]))
+  }
+  console.log(`   Function.ability(${print.join(', ')})`)
+}
 
+function generate_py_abilities(data) {
+  // Generate the list of functions in actions.py.
+  const func_ids = 12
+  const abilities = Object.values(data.abilities).sort((a, b) => (sort_key(data, a) > sort_key(data, b)) ? 1 : -1)
+  abilities.forEach((key) => {
+    const ability = abilities[key]
+    const ab_id = ability.abilityID
+    if (skip_abilities.includes(ab_id) || (data.general_abilities.includes(ab_id) && used_abilities.includes(ab_id))) {
+      return
+    }
+    const name = generate_name(ability).replace(' ', '_')
+
+    if ([sc_data.AbilityData.Target['NONE'], sc_data.AbilityData.Target['POINTORNONE']].inclues(ability.target)) {
+      print_action(func_ids, name + 'Quick', 'cmdQuick', ab_id, ability.remapsToAbilityId)
+    }
+    if (ability.target !== sc_data.AbilityData.Target['NONE']) {
+      print_action(func_ids, name + 'Screen', 'cmdScreen', ab_id, ability.remapsToAbilityId)
+      if (ability.allowMinimap) {
+        print_action(func_ids, name + 'Minimap', 'cmdMinimap', ab_id, ability.remapsToAbilityId)
+      }
+    }
+    if (ability.allowAutocast) {
+      print_action(func_ids, name + 'Autocast', 'autocast', ab_id, ability.remapsToAbilityId)
+    }
+  })
 }
 
 function main() {
   const data = get_data()
   console.log('-'.repeat(60))
-
+  generate_csv(data)
   if (flags.get('command') == 'csv') {
-    generate_scv(data)
+    generate_csv(data)
   } else if (flags.get('command') == 'python') {
     generate_py_abilities(data)
   }
 }
-
-
-
 
 flags.defineBoolean('m', false, 'treat file as module')
 flags.parse()
