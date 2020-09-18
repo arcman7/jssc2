@@ -63,7 +63,7 @@
     "modulePathIgnorePatterns": [
       ".git",
       "/tests/",
-      "/bin/"
+      "/bin/",
       "renderer_human"
     ]
   }
