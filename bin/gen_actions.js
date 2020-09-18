@@ -83,15 +83,16 @@ function generate_csv(data) {
   // Generate a CSV of the abilities for easy commenting.
   console.log(['abilityId', 'linkName', 'linkIndex', 'buttonName', 'hotkey', 'friendlyName', 'remapTo', 'mismatch'].join(','))
   const abilities = Object.values(data.abilities).sort((a, b) => (sort_key(data, a) > sort_key(data, b)) ? 1 : -1)
-  abilities.forEach((key) => {
-    const ability = abilities[key]
+  const generalAbilities = Array.from(data._general_abilities)
+  for (let i = 0; i < abilities.length; i += 1) {
+    const ability = abilities[i]
     const ab_id = ability.abilityId
-    if (skip_abilities.includes(ab_id) || (!data.general_abilities.includes(ab_id) && !used_abilities.includes(ab_id))) {
-      return
+    if (skip_abilities.includes(ab_id) || (!generalAbilities.includes(ab_id) && !used_abilities.includes(ab_id))) {
+      continue
     }
 
     let general = ''
-    if (data.general_abilities.includes(ab_id)) {
+    if (generalAbilities.includes(ab_id)) {
       general = 'general'
     } else if (ability.remapsToAbilityId) {
       general = ability.remapsToAbilityId
@@ -119,8 +120,8 @@ function generate_csv(data) {
       ability.friendlyName,
       general,
       mismatch,
-    ].map((v) => String(v))).join(',')
-  })
+    ].join(','))
+  }
 }
 
 function print_action(func_id, name, func, ab_id, general_id) {
@@ -139,11 +140,12 @@ function generate_py_abilities(data) {
   // Generate the list of functions in actions.py.
   let func_ids = 12
   const abilities = Object.values(data.abilities).sort((a, b) => (sort_key(data, a) > sort_key(data, b)) ? 1 : -1)
-  abilities.forEach((key) => {
-    const ability = abilities[key]
+  const generalAbilities = Array.from(data._general_abilities)
+  for (let i = 0; i < abilities.length; i += 1) {
+    const ability = abilities[i]
     const ab_id = ability.abilityID
-    if (skip_abilities.includes(ab_id) || (data.general_abilities.includes(ab_id) && used_abilities.includes(ab_id))) {
-      return
+    if (skip_abilities.includes(ab_id) || (generalAbilities.includes(ab_id) && used_abilities.includes(ab_id))) {
+      continue
     }
     const name = generate_name(ability).replace(' ', '_')
 
@@ -160,13 +162,13 @@ function generate_py_abilities(data) {
       print_action(func_ids, name + 'Autocast', 'autocast', ab_id, ability.remapsToAbilityId)
     }
     func_ids += 1
-  })
+  }
 }
 
-function main() {
-  const data = get_data()
+async function main() {
+  const data = await get_data()
   console.log('-'.repeat(60))
-  generate_csv(data)
+  // generate_csv(data)
   if (flags.get('command') == 'csv') {
     generate_csv(data)
   } else if (flags.get('command') == 'python') {
