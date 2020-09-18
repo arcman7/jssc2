@@ -137,7 +137,7 @@ function print_action(func_id, name, func, ab_id, general_id) {
 
 function generate_py_abilities(data) {
   // Generate the list of functions in actions.py.
-  const func_ids = 12
+  let func_ids = 12
   const abilities = Object.values(data.abilities).sort((a, b) => (sort_key(data, a) > sort_key(data, b)) ? 1 : -1)
   abilities.forEach((key) => {
     const ability = abilities[key]
@@ -159,6 +159,7 @@ function generate_py_abilities(data) {
     if (ability.allowAutocast) {
       print_action(func_ids, name + 'Autocast', 'autocast', ab_id, ability.remapsToAbilityId)
     }
+    func_ids += 1
   })
 }
 
