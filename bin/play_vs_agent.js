@@ -278,7 +278,7 @@ async function human() {
   }
 }
 
-function main() {
+async function main() {
   if (flags.get('human')) {
     human()
   } else {
